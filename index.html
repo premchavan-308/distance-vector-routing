@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distance Vector Routing Simulator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            margin: 20px;
+            transition: transform 0.3s ease;
+        }
+        .container:hover {
+            transform: translateY(-5px);
+        }
+        h1 {
+            text-align: center;
+            color: #4a4a4a;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        h2 {
+            color: #5a5a5a;
+            margin-top: 20px;
+            font-size: 1.5em;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        input[type="number"]:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+            outline: none;
+        }
+        button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            margin: 5px;
+        }
+        button:hover {
+            background: linear-gradient(45deg, #764ba2, #667eea);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .connection {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .connection input {
+            flex: 1;
+            min-width: 100px;
+        }
+        #connections {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+        #output {
+            margin-top: 20px;
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            max-height: 400px;
+            overflow-y: auto;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        p {
+            font-style: italic;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Distance Vector Routing Simulator</h1>
+        <label for="numRouters">Number of Routers:</label>
+        <input type="number" id="numRouters" min="1" max="20" value="5">
+        <button id="setRouters">Set Routers</button>
+        
+        <div id="connections">
+            <h2>Add Connections</h2>
+            <div class="connection">
+                <input type="number" id="u" placeholder="Source Router" min="1">
+                <input type="number" id="v" placeholder="Destination Router" min="1">
+                <input type="number" id="w" placeholder="Cost" min="0">
+                <button id="addConnection">Add Connection</button>
+            </div>
+            <p>Enter -1 for source to stop adding.</p>
+            <button id="compute">Compute Routing Tables</button>
+        </div>
+        
+        <div id="output"></div>
+    </div>
+
+    <script>
+        const INF = 1000;
+        let routers = [];
+        let numberOfRouters = 0;
+        let costMatrix = [];
+
+        class Router {
+            constructor() {
+                this.distance = new Array(21).fill(INF);
+                this.from = new Array(21).fill(-1);
+            }
+        }
+
+        document.getElementById('setRouters').addEventListener('click', () => {
+            numberOfRouters = parseInt(document.getElementById('numRouters').value);
+            if (numberOfRouters < 1 || numberOfRouters > 20) {
+                alert('Number of routers must be between 1 and 20.');
+                return;
+            }
+            routers = [];
+            for (let i = 0; i <= 20; i++) {
+                routers.push(new Router());
+            }
+            for (let i = 1; i <= numberOfRouters; i++) {
+                routers[i].distance[i] = 0;
+                routers[i].from[i] = i;
+            }
+            costMatrix = Array.from({length: numberOfRouters + 1}, () => Array(numberOfRouters + 1).fill(INF));
+            document.getElementById('connections').style.display = 'block';
+            document.getElementById('output').innerHTML = '';
+        });
+
+        document.getElementById('addConnection').addEventListener('click', () => {
+            let u = parseInt(document.getElementById('u').value);
+            let v = parseInt(document.getElementById('v').value);
+            let w = parseInt(document.getElementById('w').value);
+            if (u === -1) return;
+            if (u < 1 || u > numberOfRouters || v < 1 || v > numberOfRouters || w < 0) {
+                alert('Invalid input.');
+                return;
+            }
+            routers[u].distance[v] = w;
+            routers[v].distance[u] = w;
+            routers[u].from[v] = v;
+            routers[v].from[u] = u;
+            costMatrix[u][v] = w;
+            costMatrix[v][u] = w;
+            document.getElementById('u').value = '';
+            document.getElementById('v').value = '';
+            document.getElementById('w').value = '';
+        });
+
+        document.getElementById('compute').addEventListener('click', () => {
+            let count;
+            do {
+                count = 0;
+                for (let i = 1; i <= numberOfRouters; i++) {
+                    for (let j = 1; j <= numberOfRouters; j++) {
+                        for (let k = 1; k <= numberOfRouters; k++) {
+                            if (routers[i].distance[j] > costMatrix[i][k] + routers[k].distance[j]) {
+                                routers[i].distance[j] = costMatrix[i][k] + routers[k].distance[j];
+                                routers[i].from[j] = k;
+                                count++;
+                            }
+                        }
+                    }
+                }
+            } while (count !== 0);
+
+            let output = '';
+            for (let i = 1; i <= numberOfRouters; i++) {
+                output += `\nFor router ${i}\n`;
+                for (let j = 1; j <= numberOfRouters; j++) {
+                    output += `${j}th Node via ${routers[i].from[j]} with cost ${routers[i].distance[j]}\n`;
+                }
+            }
+            document.getElementById('output').innerText = output;
+        });
+    </script>
+</body>
+</html>
